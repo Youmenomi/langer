@@ -62,10 +62,10 @@ function getDefOptions() {
 }
 
 export class Langer<TData = Dictionary> {
-  protected _says?: Dictionary;
-  protected _data?: any;
-  protected _availableLanguages?: string[];
-  protected _currLanguage?: string;
+  protected _says?: Dictionary = undefined;
+  protected _data?: any = undefined;
+  protected _availableLanguages?: string[] = undefined;
+  protected _currLanguage?: string = undefined;
 
   protected _recorder: Recorder;
   protected _preset: Preset;

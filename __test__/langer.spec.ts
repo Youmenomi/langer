@@ -1,4 +1,4 @@
-import { configure, autorun, observable, action, extendObservable } from 'mobx';
+import { autorun, makeAutoObservable } from 'mobx';
 import { Langer, presetLanguage } from '../src';
 import {
   AsyncDriver,
@@ -250,35 +250,20 @@ describe('langer', () => {
   });
 
   it('mobx', async () => {
-    configure({ enforceActions: 'observed' });
-
     const langer = new Langer();
 
-    extendObservable(
-      langer,
-      {
-        //@ts-expect-errors
-        _says: langer._says,
-        //@ts-expect-errors
-        _availableLanguages: langer._availableLanguages,
-        //@ts-expect-errors
-        _currLanguage: langer._currLanguage,
-        //@ts-expect-error
-        setSays: langer.setSays,
-        //@ts-expect-error
-        setAvailableLanguages: langer.setAvailableLanguages,
-        //@ts-expect-error
-        setCurrLanguage: langer.setCurrLanguage,
-      },
-      {
-        _says: observable,
-        _availableLanguages: observable,
-        _currLanguage: observable,
-        setSays: action,
-        setAvailableLanguages: action,
-        setCurrLanguage: action,
-      }
-    );
+    makeAutoObservable(langer, {
+      //@ts-expect-error
+      _recorder: false,
+      _preset: false,
+      initialize: false,
+      internalUpdate: false,
+      update: false,
+      changeSays: false,
+      speak: false,
+      resetLanguage: false,
+      dispose: false,
+    });
 
     await langer.initialize(updated);
 
