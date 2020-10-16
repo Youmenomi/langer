@@ -15,9 +15,9 @@ export type Preset =
       navigatorLanguages: string[]
     ) => Promise<string> | string);
 
-type Options = {
-  recorder: Recorder;
-  preset: Preset;
+export type Options = {
+  recorder?: Recorder;
+  preset?: Preset;
 };
 
 const LOCAL_STORAGE_KEY = 'langer-local-storage-key';
@@ -54,7 +54,7 @@ export function presetLanguage(
   return found;
 }
 
-function getDefOptions(): Options {
+function getDefOptions() {
   return {
     preset: presetLanguage,
     recorder,
@@ -80,7 +80,7 @@ export class Langer<TData = Dictionary> {
     return this._dispoed;
   }
 
-  constructor(options: Partial<Options> = getDefOptions()) {
+  constructor(options: Options = getDefOptions()) {
     const { recorder, preset } = defaults(options, getDefOptions());
     this._recorder = recorder;
     this._preset = preset;
