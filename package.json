@@ -22,7 +22,8 @@
     "ts:check": "tsc --noEmit -p tsconfig.build.json",
     "build:js": "rollup -c",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
-    "build": "npm run ts:check && eslint --ext .ts,.js ./src && npm run build:js && npm run build:types",
+    "build:clean": "del dist",
+    "build": "npm run ts:check && eslint --ext .ts,.js ./src && npm run build:clean && npm run build:js && npm run build:types",
     "release": "np",
     "version": "npm run build"
   },
@@ -58,6 +59,7 @@
     "@typescript-eslint/parser": "^4.4.1",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^26.5.2",
+    "del-cli": "^3.0.1",
     "eslint": "^7.11.0",
     "eslint-config-prettier": "^6.12.0",
     "eslint-plugin-prettier": "^3.1.4",
