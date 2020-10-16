@@ -20,7 +20,7 @@ export type Options = {
   preset?: Preset;
 };
 
-const LOCAL_STORAGE_KEY = 'langer-local-storage-key';
+export const LOCAL_STORAGE_KEY = 'langer-local-storage-key';
 export const recorder: Recorder = {
   get: () => {
     return localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -80,7 +80,7 @@ export class Langer<TData = Dictionary> {
     return this._dispoed;
   }
 
-  constructor(options: Options = getDefOptions()) {
+  constructor(options?: Options) {
     const { recorder, preset } = defaults(options, getDefOptions());
     this._recorder = recorder;
     this._preset = preset;
