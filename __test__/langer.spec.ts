@@ -118,7 +118,7 @@ describe('langer', () => {
 
     const updatedLanger = await langer.update(updated);
     //@ts-expect-error
-    expect(langer === updatedLanger).toBeTruthy;
+    expect(langer === updatedLanger).toBeTruthy();
     expect(updatedLanger.speaking).toBe('zh');
     expect(updatedLanger.says.enter).toBe(updated.zh.enter);
     expect(updatedLanger.says.setting.quality).toBe(updated.zh.setting.quality);
@@ -260,7 +260,7 @@ describe('langer', () => {
       setAvailableLanguages: action,
       setCurrLanguage: action,
       setInitialized: action,
-      setDisposed: action,
+      dispose: action,
     });
 
     await langer.initialize(updated);

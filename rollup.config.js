@@ -29,6 +29,6 @@ export default [].concat(
       format: 'umd',
       name: 'langer',
     },
-    { withMin: true, resolveOnly: ['custom-defaults'] }
+    { withMin: true }
   )
 )

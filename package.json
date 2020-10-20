@@ -8,7 +8,8 @@
     "Localization",
     "globalization",
     "translation",
-    "multi-language"
+    "multi-language",
+    "remote"
   ],
   "main": "dist/cjs/langer.cjs.js",
   "module": "dist/esm/langer.esm.js",
@@ -53,7 +54,7 @@
     "@babel/plugin-proposal-decorators": "^7.12.1",
     "@babel/preset-env": "^7.12.1",
     "@babel/preset-typescript": "^7.12.1",
-    "@types/jest": "^26.0.14",
+    "@types/jest": "^26.0.15",
     "@typescript-eslint/eslint-plugin": "^4.5.0",
     "@typescript-eslint/parser": "^4.5.0",
     "babel-eslint": "^10.1.0",

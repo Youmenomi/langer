@@ -99,9 +99,6 @@ export class Langer<TData = Dictionary> {
   protected setInitialized() {
     this._initialized = true;
   }
-  protected setDisposed() {
-    this._disposed = true;
-  }
 
   async initialize<T extends Dictionary = Dictionary>(
     data: T,
@@ -241,6 +238,6 @@ export class Langer<TData = Dictionary> {
     //@ts-expect-error
     this.setCurrLanguage(undefined);
 
-    this.setDisposed();
+    this._disposed = true;
   }
 }
