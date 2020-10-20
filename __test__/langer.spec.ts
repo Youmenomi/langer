@@ -1,4 +1,4 @@
-import { autorun, makeAutoObservable } from 'mobx';
+import { action, autorun, configure, makeObservable, observable } from 'mobx';
 import { Langer, presetLanguage } from '../src';
 import {
   AsyncDriver,
@@ -7,8 +7,6 @@ import {
   presetSaved,
   setSaved,
 } from './helper';
-
-const env = process.env;
 
 const fetched = {
   en: {
@@ -63,10 +61,6 @@ const updated = {
 } as const;
 
 describe('langer', () => {
-  const warn = jest
-    .spyOn(global.console, 'warn')
-    .mockImplementation(() => true);
-
   jest
     .spyOn(Object.getPrototypeOf(localStorage) as Storage, 'getItem')
     .mockImplementation((name: string) => {
@@ -85,13 +79,7 @@ describe('langer', () => {
     });
 
   beforeEach(() => {
-    process.env = { ...env };
-    warn.mockClear();
     clearSaved();
-  });
-
-  afterAll(() => {
-    process.env = env;
   });
 
   it('presetLanguage', () => {
@@ -136,51 +124,51 @@ describe('langer', () => {
     expect(updatedLanger.says.setting.quality).toBe(updated.zh.setting.quality);
 
     updatedLanger.dispose();
-    expect(langer.dispoed).toBeTruthy();
+    expect(langer.disposed).toBeTruthy();
     expect(() => langer.availableLanguages).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     expect(() => langer.speaking).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     expect(() => langer.says).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     await expect(async () => await langer.speak('en')).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     await expect(async () => await langer.resetLanguage()).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     await expect(async () => await langer.update(updated)).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
   });
 
   it('error', async () => {
     const langer = new Langer();
     expect(() => langer.availableLanguages).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     expect(() => langer.says).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     expect(() => langer.speaking).toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
 
     await expect(async () => langer.resetLanguage()).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     await expect(async () => langer.speak('en')).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
     await expect(async () => langer.update({})).rejects.toThrowError(
-      '[langer] Not initialized yet, failed to initialize or disposed.'
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
     );
 
     await expect(async () => langer.initialize({})).rejects.toThrowError(
-      '[langer] initialization failed. Unable to get the list of available languages.'
+      '[langer] Initialization failed. Unable to get the list of available languages.'
     );
     expect(langer.initialized).toBeFalsy();
     await langer.initialize(fetched);
@@ -189,7 +177,7 @@ describe('langer', () => {
       '[langer] Cannot speak the "ja" language that are not on the available languages(en,zh).'
     );
     await expect(async () => langer.update({})).rejects.toThrowError(
-      '[langer] initialization failed. Unable to get the list of available languages.'
+      '[langer] Initialization failed. Unable to get the list of available languages.'
     );
 
     clearSaved();
@@ -197,6 +185,11 @@ describe('langer', () => {
       new Langer({ preset: 'ja' }).initialize(fetched)
     ).rejects.toThrowError(
       '[langer] The preset language "ja" is not on the available languages(en,zh).'
+    );
+
+    langer.dispose();
+    await expect(async () => langer.dispose()).rejects.toThrowError(
+      '[langer] Invalid operation. This has been disposed.'
     );
   });
 
@@ -223,14 +216,11 @@ describe('langer', () => {
   it('warn', async () => {
     const langer = await new Langer();
     await langer.initialize(fetched);
-    await langer.initialize(fetched);
-
-    process.env.NODE_ENV = 'development';
-    expect(console.warn).toBeCalledTimes(0);
-    await langer.initialize(fetched);
-    expect(console.warn).toBeCalledTimes(1);
-    await langer.initialize(fetched);
-    expect(console.warn).toBeCalledTimes(2);
+    await expect(
+      async () => await langer.initialize(fetched)
+    ).rejects.toThrowError(
+      '[langer] Invalid operation. This has been initialized.'
+    );
   });
 
   it('async recorder', async () => {
@@ -250,19 +240,27 @@ describe('langer', () => {
   });
 
   it('mobx', async () => {
-    const langer = new Langer();
+    configure({
+      enforceActions: 'always',
+      computedRequiresReaction: true,
+      reactionRequiresObservable: true,
+      // observableRequiresReaction: true,
+      // disableErrorBoundaries: true,
+    });
 
-    makeAutoObservable(langer, {
+    const langer = new Langer();
+    makeObservable(langer, {
       //@ts-expect-error
-      _recorder: false,
-      _preset: false,
-      initialize: false,
-      internalUpdate: false,
-      update: false,
-      changeSays: false,
-      speak: false,
-      resetLanguage: false,
-      dispose: false,
+      _says: observable,
+      _availableLanguages: observable,
+      _currLanguage: observable,
+      _initialized: observable,
+      _disposed: observable,
+      setSays: action,
+      setAvailableLanguages: action,
+      setCurrLanguage: action,
+      setInitialized: action,
+      setDisposed: action,
     });
 
     await langer.initialize(updated);
@@ -352,17 +350,17 @@ describe('langer', () => {
     await langer.dispose();
     expect(view1).lastReturnedWith(
       new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       )
     );
     expect(view2).lastReturnedWith(
       new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       )
     );
     expect(view3).lastReturnedWith(
       new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       )
     );
   });

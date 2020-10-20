@@ -75,9 +75,9 @@ export class Langer<TData = Dictionary> {
     return this._initialized;
   }
 
-  protected _dispoed = false;
-  get dispoed() {
-    return this._dispoed;
+  protected _disposed = false;
+  get disposed() {
+    return this._disposed;
   }
 
   constructor(options?: Options) {
@@ -96,20 +96,22 @@ export class Langer<TData = Dictionary> {
     this._currLanguage = value;
   }
 
+  protected setInitialized() {
+    this._initialized = true;
+  }
+  protected setDisposed() {
+    this._disposed = true;
+  }
+
   async initialize<T extends Dictionary = Dictionary>(
     data: T,
     reset = false
   ): Promise<Langer<T>> {
     if (this._initialized) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn(
-          `[langer] Invalid operation. Because the initialization is complete.`
-        );
-      }
-      return (this as unknown) as Langer<T>;
+      throw new Error('[langer] Invalid operation. This has been initialized.');
     }
     await this.internalUpdate(data, reset);
-    this._initialized = true;
+    this.setInitialized();
     return (this as unknown) as Langer<T>;
   }
 
@@ -118,7 +120,7 @@ export class Langer<TData = Dictionary> {
     const langs = Object.keys(this._data);
     if (!langs || langs.length === 0) {
       throw new Error(
-        '[langer] initialization failed. Unable to get the list of available languages.'
+        '[langer] Initialization failed. Unable to get the list of available languages.'
       );
     }
     this.setAvailableLanguages(langs);
@@ -140,9 +142,9 @@ export class Langer<TData = Dictionary> {
     data: T,
     reset = false
   ): Promise<Langer<T>> {
-    if (!this._initialized || this._dispoed) {
+    if (!this._initialized || this._disposed) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
     await this.internalUpdate(data, reset);
@@ -158,7 +160,7 @@ export class Langer<TData = Dictionary> {
   get availableLanguages() {
     if (!this._availableLanguages) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
     return this._availableLanguages as StringKeyof<TData>[];
@@ -166,7 +168,7 @@ export class Langer<TData = Dictionary> {
   get speaking() {
     if (!this._currLanguage) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
     return this._currLanguage as StringKeyof<TData>;
@@ -174,7 +176,7 @@ export class Langer<TData = Dictionary> {
   get says() {
     if (!this._says) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
     return this._says as Says<TData>;
@@ -183,7 +185,7 @@ export class Langer<TData = Dictionary> {
   async speak(language: keyof TData & string) {
     if (!this._availableLanguages) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
     if (!this._availableLanguages.includes(language)) {
@@ -197,7 +199,7 @@ export class Langer<TData = Dictionary> {
   async resetLanguage() {
     if (!this._availableLanguages) {
       throw new Error(
-        '[langer] Not initialized yet, failed to initialize or disposed.'
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       );
     }
 
@@ -222,6 +224,10 @@ export class Langer<TData = Dictionary> {
   }
 
   dispose() {
+    if (this._disposed) {
+      throw new Error('[langer] Invalid operation. This has been disposed.');
+    }
+
     //@ts-expect-error
     this._recorder = undefined;
     //@ts-expect-error
@@ -235,6 +241,6 @@ export class Langer<TData = Dictionary> {
     //@ts-expect-error
     this.setCurrLanguage(undefined);
 
-    this._dispoed = true;
+    this.setDisposed();
   }
 }
