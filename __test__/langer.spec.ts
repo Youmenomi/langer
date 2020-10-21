@@ -1,5 +1,5 @@
 import { action, autorun, configure, makeObservable, observable } from 'mobx';
-import { Langer, presetLanguage } from '../src';
+import { Langer, defaultPresetLanguage } from '../src';
 import {
   AsyncDriver,
   clearSaved,
@@ -83,11 +83,13 @@ describe('langer', () => {
   });
 
   it('presetLanguage', () => {
-    expect(presetLanguage(Object.keys(fetched), navigator.languages)).toBe(
-      'en'
-    );
-    expect(presetLanguage(Object.keys(fetched), ['zh'])).toBe('zh');
-    expect(() => presetLanguage(Object.keys(fetched), ['ja'])).toThrowError(
+    expect(
+      defaultPresetLanguage(Object.keys(fetched), navigator.languages)
+    ).toBe('en');
+    expect(defaultPresetLanguage(Object.keys(fetched), ['zh'])).toBe('zh');
+    expect(() =>
+      defaultPresetLanguage(Object.keys(fetched), ['ja'])
+    ).toThrowError(
       '[langer] The presetLanguage function cannot preset the current language.'
     );
   });

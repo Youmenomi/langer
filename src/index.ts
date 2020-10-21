@@ -21,7 +21,7 @@ export type Options = {
 };
 
 export const LOCAL_STORAGE_KEY = 'langer-local-storage-key';
-export const recorder: Recorder = {
+export const defaultRecorder: Recorder = {
   get: () => {
     return localStorage.getItem(LOCAL_STORAGE_KEY);
   },
@@ -30,7 +30,7 @@ export const recorder: Recorder = {
   },
 };
 
-export function presetLanguage(
+export function defaultPresetLanguage(
   availableLanguages: string[],
   priorities: Readonly<string[]>
 ) {
@@ -54,13 +54,6 @@ export function presetLanguage(
   return found;
 }
 
-function getDefOptions() {
-  return {
-    preset: presetLanguage,
-    recorder,
-  };
-}
-
 export class Langer<TData = Dictionary> {
   protected _says?: Dictionary = undefined;
   protected _data?: any = undefined;
@@ -81,7 +74,10 @@ export class Langer<TData = Dictionary> {
   }
 
   constructor(options?: Options) {
-    const { recorder, preset } = defaults(options, getDefOptions());
+    const { recorder, preset } = defaults(options, {
+      preset: defaultPresetLanguage,
+      recorder: defaultRecorder,
+    });
     this._recorder = recorder;
     this._preset = preset;
   }

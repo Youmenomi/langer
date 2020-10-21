@@ -25,7 +25,7 @@ export default [].concat(
   build(
     input,
     {
-      file: 'dist/umd/langer.umd.js',
+      file: `dist/umd/${pkg.name}.umd.js`,
       format: 'umd',
       name: 'langer',
     },
