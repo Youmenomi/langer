@@ -1,64 +1,36 @@
-import { action, autorun, configure, makeObservable, observable } from 'mobx';
-import { Langer, defaultPresetLanguage } from '../src';
+import {
+  action,
+  autorun,
+  computed,
+  configure,
+  makeObservable,
+  observable,
+} from 'mobx';
+import { Driver01, Driver02, Langer, presetLanguage } from '../src';
 import {
   AsyncDriver,
   clearSaved,
+  fetched,
+  fetchedLangs,
+  getFetched,
   getSaved,
+  getUpdated,
   presetSaved,
   setSaved,
+  updated,
+  updatedLangs,
 } from './helper';
 
-const fetched = {
-  en: {
-    confirm: 'Confirm',
-    cancel: 'Cancel',
-    setting: {
-      language: 'Language',
-    },
-  },
-  zh: {
-    confirm: '確認',
-    cancel: '取消',
-    setting: {
-      language: '語言',
-    },
-  },
-} as const;
 const priorities = ['en-US', 'en', 'zh-TW', 'zh'];
 const presetResult = 'en';
 
-const updated = {
-  en: {
-    confirm: 'Confirm',
-    cancel: 'Cancel',
-    enter: 'Enter',
-    setting: {
-      language: 'Language',
-      volume: 'Volume',
-      quality: 'Quality',
-    },
-  },
-  zh: {
-    confirm: '確認',
-    cancel: '取消',
-    enter: '進入',
-    setting: {
-      language: '語言',
-      volume: '音量',
-      quality: '畫質',
-    },
-  },
-  ja: {
-    confirm: '確認',
-    cancel: 'キャンセル',
-    enter: '入力',
-    setting: {
-      language: '言語',
-      volume: 'ボリューム',
-      quality: '画質',
-    },
-  },
-} as const;
+let driver01 = new Driver01(fetched);
+let driver02 = new Driver02(
+  fetchedLangs as (keyof typeof fetched)[],
+  async (lang) => {
+    return await getFetched(lang);
+  }
+);
 
 describe('langer', () => {
   jest
@@ -80,35 +52,144 @@ describe('langer', () => {
 
   beforeEach(() => {
     clearSaved();
+
+    driver01 = new Driver01(fetched, priorities);
+    driver02 = new Driver02(
+      fetchedLangs as (keyof typeof fetched)[],
+      (lang) => {
+        return getFetched(lang);
+      }
+    );
   });
 
-  it('presetLanguage', () => {
-    expect(
-      defaultPresetLanguage(Object.keys(fetched), navigator.languages)
-    ).toBe('en');
-    expect(defaultPresetLanguage(Object.keys(fetched), ['zh'])).toBe('zh');
-    expect(() =>
-      defaultPresetLanguage(Object.keys(fetched), ['ja'])
-    ).toThrowError(
-      '[langer] The presetLanguage function cannot preset the current language.'
+  it('presetLanguage', async () => {
+    expect(presetLanguage(Object.keys(fetched), navigator.languages)).toBe(
+      'en'
+    );
+    expect(presetLanguage(Object.keys(fetched), ['zh'])).toBe('zh');
+    expect(() => presetLanguage(Object.keys(fetched), ['ja'])).toThrowError(
+      '[langer] Cannot preset language.'
+    );
+  });
+
+  it('driver01', async () => {
+    const driver = new Driver01(fetched, ['ja', 'zh']);
+    let availableLanguages = driver.onAvailableLanguages();
+    expect(availableLanguages).toEqual(Object.keys(fetched));
+    expect(driver.onPresetLanguage(availableLanguages)).toEqual('zh');
+    expect(driver.onSpeakingChange('en')).toEqual(fetched.en);
+
+    driver.update(updated);
+    availableLanguages = driver.onAvailableLanguages();
+    expect(availableLanguages).toEqual(Object.keys(updated));
+    expect(driver.onPresetLanguage(availableLanguages)).toEqual('ja');
+    expect(driver.onSpeakingChange('zh')).toEqual(updated.zh);
+
+    expect(() => driver.dispose()).not.toThrow();
+  });
+
+  it('driver02', async () => {
+    const driver = new Driver02(
+      fetchedLangs as (keyof typeof fetched)[],
+      async (lang) => {
+        return await getFetched(lang);
+      },
+      ['ja', 'zh']
+    );
+    let availableLanguages = driver.onAvailableLanguages();
+    expect(availableLanguages).toEqual(Object.keys(fetched));
+    expect(driver.onPresetLanguage(availableLanguages)).toEqual('zh');
+    expect(await driver.onSpeakingChange('en')).toEqual(fetched.en);
+
+    driver.update(updatedLangs as (keyof typeof updated)[], async (lang) => {
+      return await getUpdated(lang);
+    });
+    availableLanguages = driver.onAvailableLanguages();
+    expect(availableLanguages).toEqual(Object.keys(updated));
+    expect(driver.onPresetLanguage(availableLanguages)).toEqual('ja');
+    expect(await driver.onSpeakingChange('zh')).toEqual(updated.zh);
+
+    expect(() => driver.dispose()).not.toThrow();
+  });
+
+  it('before initialized', async () => {
+    const langer = new Langer({ driver: driver01 });
+    expect(langer.initialized).toBeFalsy();
+    expect(langer.disposed).toBeFalsy();
+    expect(() => langer.availableLanguages).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.restore()).rejects.toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    expect(() => langer.isAvailable('unknow')).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.reset()).rejects.toThrowError(
+      '[langer] Invalid operation. Not initialized yet.'
+    );
+    expect(() => langer.says).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.speak('zh')).rejects.toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    expect(() => langer.speaking).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    expect(() => langer.dispose()).not.toThrow();
+    await expect(async () => await langer.initialize()).rejects.toThrowError(
+      '[langer] Invalid operation. This has been disposed.'
+    );
+  });
+
+  it('after disposed', async () => {
+    const langer = new Langer({ driver: driver02 });
+    await langer.initialize();
+    langer.dispose();
+    expect(langer.initialized).toBeTruthy();
+    expect(langer.disposed).toBeTruthy();
+    expect(() => langer.availableLanguages).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.restore()).rejects.toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    expect(() => langer.isAvailable('unknow')).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.reset()).rejects.toThrowError(
+      '[langer] Invalid operation. This has been disposed.'
+    );
+    expect(() => langer.says).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.speak('zh')).rejects.toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    expect(() => langer.speaking).toThrowError(
+      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+    );
+    await expect(async () => await langer.dispose()).rejects.toThrowError(
+      '[langer] Invalid operation. This has been disposed.'
+    );
+    await expect(async () => await langer.initialize()).rejects.toThrowError(
+      '[langer] Invalid operation. This has been disposed.'
     );
   });
 
   it('normal', async () => {
     presetSaved('zh');
 
-    const langer = new Langer<typeof fetched>();
-    expect(langer.initialized).toBeFalsy();
-    await langer.initialize(fetched);
+    let langer = new Langer({ driver: driver01 });
+    await langer.initialize();
     expect(langer.initialized).toBeTruthy();
     expect(langer.availableLanguages).toEqual(Object.keys(fetched));
-
     expect(langer.speaking).toBe('zh');
     expect(langer.says.cancel).toBe(fetched.zh.cancel);
     expect(langer.says.setting.language).toBe(fetched.zh.setting.language);
 
-    expect(await langer.resetLanguage()).toBe(presetResult);
-
+    expect(await langer.restore()).toBe(presetResult);
     expect(langer.speaking).toEqual(presetResult);
     expect(langer.says.cancel).toBe(fetched.en.cancel);
     expect(langer.says.setting.language).toBe(fetched.en.setting.language);
@@ -118,127 +199,176 @@ describe('langer', () => {
     expect(langer.says.cancel).toBe(fetched.zh.cancel);
     expect(langer.says.setting.language).toBe(fetched.zh.setting.language);
 
-    const updatedLanger = await langer.update(updated);
+    driver01.update(updated);
+    await langer.reset();
+    expect(langer.availableLanguages).toEqual(Object.keys(updated));
+    expect(langer.speaking).toBe('zh');
     //@ts-expect-error
-    expect(langer === updatedLanger).toBeTruthy();
-    expect(updatedLanger.speaking).toBe('zh');
-    expect(updatedLanger.says.enter).toBe(updated.zh.enter);
-    expect(updatedLanger.says.setting.quality).toBe(updated.zh.setting.quality);
+    expect(langer.says.enter).toBe(updated.zh.enter);
+    //@ts-expect-error
+    expect(langer.says.setting.quality).toBe(updated.zh.setting.quality);
+
+    //@ts-expect-error
+    await langer.speak('ja');
+    expect(langer.speaking).toBe('ja');
+    expect(langer.says.cancel).toBe(updated.ja.cancel);
+    expect(langer.says.setting.language).toBe(updated.ja.setting.language);
+
+    langer = await langer.reset(driver02, true);
+    expect(langer.availableLanguages).toEqual(Object.keys(fetched));
+    expect(langer.speaking).toBe('en');
+    expect(langer.says.cancel).toBe(fetched.en.cancel);
+    expect(langer.says.setting.language).toBe(fetched.en.setting.language);
+
+    const updatedLanger = await langer.reset(
+      driver02.update(
+        updatedLangs as (keyof typeof updated)[],
+        async (lang) => {
+          return await getUpdated(lang);
+        }
+      )
+    );
+    expect(updatedLanger === langer).toBeTruthy();
+    expect(updatedLanger.availableLanguages).toEqual(Object.keys(updated));
+    expect(updatedLanger.speaking).toBe('en');
+    expect(updatedLanger.says.enter).toBe(updated.en.enter);
+    expect(updatedLanger.says.setting.quality).toBe(updated.en.setting.quality);
+
+    await updatedLanger.speak('ja');
+    expect(updatedLanger.speaking).toBe('ja');
+    expect(updatedLanger.says.cancel).toBe(updated.ja.cancel);
+    expect(updatedLanger.says.setting.language).toBe(
+      updated.ja.setting.language
+    );
 
     updatedLanger.dispose();
     expect(langer.disposed).toBeTruthy();
-    expect(() => langer.availableLanguages).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    expect(() => langer.speaking).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    expect(() => langer.says).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    await expect(async () => await langer.speak('en')).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    await expect(async () => await langer.resetLanguage()).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    await expect(async () => await langer.update(updated)).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-  });
-
-  it('error', async () => {
-    const langer = new Langer();
-    expect(() => langer.availableLanguages).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    expect(() => langer.says).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    expect(() => langer.speaking).toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-
-    await expect(async () => langer.resetLanguage()).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    await expect(async () => langer.speak('en')).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-    await expect(async () => langer.update({})).rejects.toThrowError(
-      '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-    );
-
-    await expect(async () => langer.initialize({})).rejects.toThrowError(
-      '[langer] Initialization failed. Unable to get the list of available languages.'
-    );
-    expect(langer.initialized).toBeFalsy();
-    await langer.initialize(fetched);
-    expect(langer.initialized).toBeTruthy();
-    await expect(async () => langer.speak('ja')).rejects.toThrowError(
-      '[langer] Cannot speak the "ja" language that are not on the available languages(en,zh).'
-    );
-    await expect(async () => langer.update({})).rejects.toThrowError(
-      '[langer] Initialization failed. Unable to get the list of available languages.'
-    );
-
-    clearSaved();
-    await expect(async () =>
-      new Langer({ preset: 'ja' }).initialize(fetched)
-    ).rejects.toThrowError(
-      '[langer] The preset language "ja" is not on the available languages(en,zh).'
-    );
-
-    langer.dispose();
-    await expect(async () => langer.dispose()).rejects.toThrowError(
-      '[langer] Invalid operation. This has been disposed.'
-    );
   });
 
   it('recorder', async () => {
-    const langer = await new Langer().initialize(fetched);
-    expect(langer.speaking).toBe(presetResult);
-    await langer.speak('zh');
+    {
+      const langer = await new Langer({ driver: driver01 }).initialize();
+      expect(langer.speaking).toBe(presetResult);
+      await langer.speak('zh');
+    }
 
-    const otherLanger = await new Langer().initialize(updated);
-    expect(otherLanger.speaking).toBe('zh');
-    expect(otherLanger.says.setting.quality).toBe(updated.zh.setting.quality);
+    {
+      const langer = await new Langer({ driver: driver01 }).initialize();
+      const otherLanger = await langer.reset(driver01.update(updated));
+      expect(otherLanger.speaking).toBe('zh');
+      expect(otherLanger.says.setting.quality).toBe(updated.zh.setting.quality);
+    }
 
-    const anotherLanger = await new Langer().initialize(updated, true);
-    expect(anotherLanger.speaking).toBe('en');
-    expect(anotherLanger.says.enter).toBe(updated.en.enter);
+    {
+      const langer = await new Langer({ driver: driver01 }).initialize();
+      const otherLanger = await langer.reset(driver01.update(updated), true);
+      expect(otherLanger.speaking).toBe('en');
+      expect(otherLanger.says.enter).toBe(updated.en.enter);
+    }
   });
 
-  it('preset', async () => {
-    const langer = await new Langer({ preset: 'zh' }).initialize(fetched);
-    expect(langer.speaking).toBe('zh');
-    expect(langer.says.confirm).toBe(fetched.zh.confirm);
-  });
-
-  it('warn', async () => {
-    const langer = await new Langer();
-    await langer.initialize(fetched);
+  it('driver not detected', async () => {
     await expect(
-      async () => await langer.initialize(fetched)
-    ).rejects.toThrowError(
+      async () => await new Langer().initialize()
+    ).rejects.toThrowError('[langer] Driver not detected.');
+  });
+
+  it('initialize', async () => {
+    presetSaved('zh');
+
+    const langer = await new Langer().initialize(true, driver01);
+    expect(langer.speaking).toBe('en');
+
+    await expect(async () => langer.initialize()).rejects.toThrowError(
       '[langer] Invalid operation. This has been initialized.'
     );
   });
 
+  it('restore()', async () => {
+    presetSaved('zh');
+
+    const langer = await new Langer().initialize(true, driver01);
+    langer.restore();
+    expect(langer.speaking).toBe('en');
+    langer.restore();
+    expect(langer.speaking).toBe('en');
+  });
+
+  it('driver error', async () => {
+    {
+      const driver = { onAvailableLanguages: () => '' };
+      await expect(
+        //@ts-expect-error
+        async () => await new Langer().initialize(true, driver)
+      ).rejects.toThrowError(
+        '[langer] The "onAvailableLanguages" owned by the driver needs to return an array of available languages.'
+      );
+    }
+    {
+      const driver = {
+        onAvailableLanguages: () => ['ru'],
+        onPresetLanguage: () => 'ko',
+      };
+      await expect(
+        //@ts-expect-error
+        async () => await new Langer().initialize(true, driver)
+      ).rejects.toThrowError(
+        '[langer] The preset language "ko" is not on the available languages(ru).'
+      );
+    }
+    {
+      const driver = {
+        onAvailableLanguages: () => ['ru', 'ko'],
+        onPresetLanguage: () => 'ko',
+        onSpeakingChange: () => undefined,
+      };
+      await expect(
+        async () => await new Langer().initialize(true, driver)
+      ).rejects.toThrowError(
+        '[langer] The onSpeakingChange(ko) of the driver must return a value.'
+      );
+    }
+  });
+
+  it('speak error', async () => {
+    const langer = await new Langer({ driver: driver01 }).initialize();
+    await expect(
+      //@ts-expect-error
+      async () => await langer.speak('ja')
+    ).rejects.toThrowError(
+      '[langer] Can not find the "ja" language among the available languages(en,zh).'
+    );
+  });
+
   it('async recorder', async () => {
-    const langer = await new Langer({
-      recorder: new AsyncDriver(),
-    }).initialize(fetched);
-    expect(langer.speaking).toBe(presetResult);
-    await langer.speak('zh');
+    {
+      const langer = await new Langer({
+        driver: driver02,
+        recorder: new AsyncDriver(),
+      }).initialize();
+      expect(langer.speaking).toBe(presetResult);
+      await langer.speak('zh');
+    }
 
-    const otherLanger = await new Langer().initialize(updated);
-    expect(otherLanger.speaking).toBe('zh');
-    expect(otherLanger.says.setting.quality).toBe(updated.zh.setting.quality);
+    {
+      const langer = await new Langer({
+        driver: driver02,
+        recorder: new AsyncDriver(),
+      }).initialize();
+      const otherLanger = await langer.reset(driver01.update(updated));
+      expect(otherLanger.speaking).toBe('zh');
+      expect(otherLanger.says.setting.quality).toBe(updated.zh.setting.quality);
+    }
 
-    const anotherLanger = await new Langer().initialize(updated, true);
-    expect(anotherLanger.speaking).toBe('en');
-    expect(anotherLanger.says.enter).toBe(updated.en.enter);
+    {
+      const langer = await new Langer({
+        driver: driver02,
+        recorder: new AsyncDriver(),
+      }).initialize();
+      const otherLanger = await langer.reset(driver01.update(updated), true);
+      expect(otherLanger.speaking).toBe('en');
+      expect(otherLanger.says.enter).toBe(updated.en.enter);
+    }
   });
 
   it('mobx', async () => {
@@ -246,11 +376,12 @@ describe('langer', () => {
       enforceActions: 'always',
       computedRequiresReaction: true,
       reactionRequiresObservable: true,
-      // observableRequiresReaction: true,
+      observableRequiresReaction: true,
       // disableErrorBoundaries: true,
     });
 
     const langer = new Langer();
+
     makeObservable(langer, {
       //@ts-expect-error
       _says: observable,
@@ -263,9 +394,16 @@ describe('langer', () => {
       setCurrLanguage: action,
       setInitialized: action,
       dispose: action,
+      availableLanguages: computed,
+      initialize: action,
+      restore: action,
+      isAvailable: action,
+      speak: action,
+      reset: action,
+      boost: action,
     });
 
-    await langer.initialize(updated);
+    await langer.initialize(false, driver01.update(updated));
 
     const view1 = jest.fn(() => {
       try {
@@ -320,7 +458,7 @@ describe('langer', () => {
       `The supported languages are ${'en,zh,ja'}. The current language is ${'zh'}`
     );
 
-    await langer.resetLanguage();
+    await langer.restore();
     expect(view1).toBeCalledTimes(3);
     expect(view1).lastReturnedWith(
       `btn:${updated.en.cancel},btn:${updated.en.confirm}`
@@ -334,7 +472,7 @@ describe('langer', () => {
       `The supported languages are ${'en,zh,ja'}. The current language is ${'en'}`
     );
 
-    await langer.update(fetched);
+    await langer.reset(driver01.update(fetched));
     expect(view1).toBeCalledTimes(4);
     expect(view1).lastReturnedWith(
       `btn:${fetched.en.cancel},btn:${fetched.en.confirm}`
@@ -350,16 +488,19 @@ describe('langer', () => {
     );
 
     await langer.dispose();
+    expect(view3).toBeCalledTimes(5);
     expect(view1).lastReturnedWith(
       new Error(
         '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       )
     );
+    expect(view3).toBeCalledTimes(5);
     expect(view2).lastReturnedWith(
       new Error(
         '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
       )
     );
+    expect(view3).toBeCalledTimes(5);
     expect(view3).lastReturnedWith(
       new Error(
         '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'

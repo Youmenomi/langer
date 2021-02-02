@@ -35,3 +35,65 @@ function delay(t: number) {
     setTimeout(resolve, t);
   });
 }
+
+export const fetched = {
+  en: {
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    setting: {
+      language: 'Language',
+    },
+  },
+  zh: {
+    confirm: '確認',
+    cancel: '取消',
+    setting: {
+      language: '語言',
+    },
+  },
+} as const;
+
+export const updated = {
+  en: {
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    enter: 'Enter',
+    setting: {
+      language: 'Language',
+      volume: 'Volume',
+      quality: 'Quality',
+    },
+  },
+  zh: {
+    confirm: '確認',
+    cancel: '取消',
+    enter: '進入',
+    setting: {
+      language: '語言',
+      volume: '音量',
+      quality: '畫質',
+    },
+  },
+  ja: {
+    confirm: '確認',
+    cancel: 'キャンセル',
+    enter: '入力',
+    setting: {
+      language: '言語',
+      volume: 'ボリューム',
+      quality: '画質',
+    },
+  },
+} as const;
+
+export const fetchedLangs = Object.keys(fetched);
+export async function getFetched(lang: keyof typeof fetched) {
+  await delay(100);
+  return fetched[lang];
+}
+
+export const updatedLangs = Object.keys(updated);
+export async function getUpdated(lang: keyof typeof updated) {
+  await delay(100);
+  return updated[lang];
+}

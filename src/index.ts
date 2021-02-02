@@ -1,23 +1,25 @@
 import { defaults } from 'custom-defaults';
-import { Dictionary, StringKeyof } from './helper';
 
-type Says<TSays extends Dictionary> = TSays[keyof TSays];
+export type DriverInterface<TSays = any, TLangs extends string[] = string[]> = {
+  onAvailableLanguages: () => Promise<TLangs> | TLangs;
+  onPresetLanguage: (
+    availableLanguages: TLangs
+  ) => Promise<TLangs[number]> | TLangs[number];
+  onSpeakingChange: (Language: TLangs[number]) => Promise<TSays> | TSays;
+};
 
 export type Recorder = {
   get: () => Promise<string | null> | (string | null);
   set: (lang: string) => Promise<void> | void;
 };
 
-export type Preset =
-  | string
-  | ((
-      availableLanguages: string[],
-      navigatorLanguages: string[]
-    ) => Promise<string> | string);
-
-export type Options = {
+export type Options<
+  TDriver,
+  TSays = any,
+  TLangs extends string[] = string[]
+> = {
+  driver?: TDriver & DriverInterface<TSays, TLangs>;
   recorder?: Recorder;
-  preset?: Preset;
 };
 
 export const LOCAL_STORAGE_KEY = 'langer-local-storage-key';
@@ -30,11 +32,216 @@ export const defaultRecorder: Recorder = {
   },
 };
 
-export function defaultPresetLanguage(
-  availableLanguages: string[],
-  priorities: Readonly<string[]>
+export class Langer<
+  TSays = any,
+  TLangs extends string[] = string[],
+  TDriver = undefined
+> {
+  protected _driver: DriverInterface<TSays, TLangs> | undefined;
+  protected get driver() {
+    if (!this._driver) {
+      throw new Error('[langer] Driver not detected.');
+    }
+    return this._driver;
+  }
+
+  protected _recorder: Recorder;
+  protected async setRecord(Language: string) {
+    await this._recorder.set(Language);
+  }
+  protected async getRecord() {
+    return await this._recorder.get();
+  }
+
+  protected _availableLanguages?: TLangs = undefined;
+  get availableLanguages() {
+    if (!this._availableLanguages) {
+      throw new Error(
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+      );
+    }
+    return this._availableLanguages;
+  }
+  protected setAvailableLanguages(value: TLangs) {
+    this._availableLanguages = value;
+  }
+
+  protected _says?: TSays = undefined;
+  get says() {
+    if (!this._says) {
+      throw new Error(
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+      );
+    }
+    return this._says;
+  }
+  protected setSays(value: TSays) {
+    this._says = value;
+  }
+
+  protected _currLanguage?: TLangs[number] = undefined;
+  get speaking() {
+    if (!this._currLanguage) {
+      throw new Error(
+        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
+      );
+    }
+    return this._currLanguage;
+  }
+  protected setCurrLanguage(value: TLangs[number]) {
+    this._currLanguage = value;
+  }
+
+  protected _initialized = false;
+  get initialized() {
+    return this._initialized;
+  }
+  protected setInitialized() {
+    this._initialized = true;
+  }
+
+  protected _disposed = false;
+  get disposed() {
+    return this._disposed;
+  }
+
+  constructor(options?: Options<TDriver, TSays, TLangs>) {
+    const { driver, recorder } = defaults(options, {
+      recorder: defaultRecorder,
+    });
+    this._driver = driver;
+    this._recorder = recorder;
+  }
+
+  async initialize<
+    TSays = any,
+    TLangs extends string[] = string[],
+    TDriver = undefined
+  >(restore = false, driver?: TDriver & DriverInterface<TSays, TLangs>) {
+    if (!this._disposed && this._initialized) {
+      throw new Error('[langer] Invalid operation. This has been initialized.');
+    }
+
+    if (driver) this._driver = driver as any;
+    await this.boost(restore);
+    this.setInitialized();
+    return (this as any) as TDriver extends undefined
+      ? this
+      : Langer<TSays, TLangs>;
+  }
+
+  protected async boost(restore: boolean) {
+    if (this._disposed) {
+      throw new Error('[langer] Invalid operation. This has been disposed.');
+    }
+
+    const langs = await this.onAvailableLanguages();
+    this.setAvailableLanguages(langs);
+
+    let lang: string | null = null;
+    if (!restore) {
+      lang = await this.getRecord();
+    }
+
+    if (restore || !lang) {
+      await this.restore();
+    } else {
+      await this.speak(lang);
+    }
+  }
+
+  protected async onAvailableLanguages() {
+    const langs = await this.driver.onAvailableLanguages();
+    if (!Array.isArray(langs)) {
+      throw new Error(
+        `[langer] The "onAvailableLanguages" owned by the driver needs to return an array of available languages.`
+      );
+    }
+    return langs;
+  }
+
+  async restore() {
+    const currLanguage = this._currLanguage;
+    const lang = await this.onPresetLanguage();
+    if (lang !== currLanguage) {
+      await this.speak(lang);
+    }
+    return lang;
+  }
+
+  protected async onPresetLanguage() {
+    const langs = this.availableLanguages;
+    const lang = await this.driver.onPresetLanguage(langs);
+    if (!this.isAvailable(lang)) {
+      throw new Error(
+        `[langer] The preset language "${lang}" is not on the available languages(${langs}).`
+      );
+    }
+    return lang;
+  }
+
+  isAvailable(Language: string) {
+    return this.availableLanguages.includes(Language);
+  }
+
+  async speak(language: TLangs[number]) {
+    const langs = this.availableLanguages;
+    if (!langs.includes(language)) {
+      throw new Error(
+        `[langer] Can not find the "${language}" language among the available languages(${langs}).`
+      );
+    }
+    this.setSays(await this.onSpeakingChange(language));
+    await this.setRecord(language);
+    this.setCurrLanguage(language);
+  }
+
+  protected async onSpeakingChange(lang: string) {
+    const says = await this.driver.onSpeakingChange(lang);
+    if (!says) {
+      throw new Error(
+        `[langer] The onSpeakingChange(${lang}) of the driver must return a value.`
+      );
+    }
+    return says;
+  }
+
+  async reset<
+    TSays = any,
+    TLangs extends string[] = string[],
+    TDriver = undefined
+  >(driver?: TDriver & DriverInterface<TSays, TLangs>, restore = false) {
+    if (!this._initialized) {
+      throw new Error('[langer] Invalid operation. Not initialized yet.');
+    }
+
+    if (driver) this._driver = driver as any;
+    await this.boost(restore);
+    return (this as any) as TDriver extends undefined
+      ? this
+      : Langer<TSays, TLangs>;
+  }
+
+  dispose() {
+    if (this._disposed) {
+      throw new Error('[langer] Invalid operation. This has been disposed.');
+    }
+    this._driver = undefined;
+    //@ts-expect-error
+    this._recorder = undefined;
+    this._says = undefined;
+    this._availableLanguages = undefined;
+    this._currLanguage = undefined;
+
+    this._disposed = true;
+  }
+}
+
+export function presetLanguage<TLangs extends string[]>(
+  availableLanguages: TLangs,
+  priorities: readonly string[]
 ) {
-  let found: string | undefined;
+  let found: TLangs[number] | undefined;
   priorities.some((lang) => {
     if (availableLanguages.includes(lang)) {
       found = lang;
@@ -47,193 +254,76 @@ export function defaultPresetLanguage(
     }
     return false;
   });
-  if (!found)
-    throw new Error(
-      '[langer] The presetLanguage function cannot preset the current language.'
-    );
+  if (!found) throw new Error('[langer] Cannot preset language.');
   return found;
 }
 
-export class Langer<TData = Dictionary> {
-  protected _says?: Dictionary = undefined;
-  protected _data?: any = undefined;
-  protected _availableLanguages?: string[] = undefined;
-  protected _currLanguage?: string = undefined;
-
-  protected _recorder: Recorder;
-  protected _preset: Preset;
-
-  protected _initialized = false;
-  get initialized() {
-    return this._initialized;
+export class Driver01<
+  TData extends { [lang in string]: TSays },
+  TLang extends string = Exclude<keyof TData, number | symbol>,
+  TSays = TData[TLang],
+  TLangs extends string[] = TLang[]
+> implements DriverInterface<TSays, TLangs> {
+  constructor(
+    private _data: TData,
+    private _priorities = navigator.languages
+  ) {}
+  update<
+    TData extends { [lang in string]: TSays },
+    TLang extends string = Exclude<keyof TData, number | symbol>,
+    TSays = TData[TLang],
+    TLangs extends string[] = TLang[]
+  >(data: TData) {
+    this._data = data as any;
+    return (this as any) as Driver01<TData, TLang, TSays, TLangs>;
   }
-
-  protected _disposed = false;
-  get disposed() {
-    return this._disposed;
+  onAvailableLanguages() {
+    return Object.keys(this._data) as TLangs;
   }
-
-  constructor(options?: Options) {
-    const { recorder, preset } = defaults(options, {
-      preset: defaultPresetLanguage,
-      recorder: defaultRecorder,
-    });
-    this._recorder = recorder;
-    this._preset = preset;
+  onPresetLanguage(availableLanguages: TLangs) {
+    return presetLanguage(availableLanguages, this._priorities);
   }
-
-  protected setSays(value: Dictionary) {
-    this._says = value;
+  onSpeakingChange(Language: keyof TData) {
+    return this._data[Language];
   }
-  protected setAvailableLanguages(value: string[]) {
-    this._availableLanguages = value;
-  }
-  protected setCurrLanguage(value: string) {
-    this._currLanguage = value;
-  }
-
-  protected setInitialized() {
-    this._initialized = true;
-  }
-
-  async initialize<T extends Dictionary = Dictionary>(
-    data: T,
-    reset = false
-  ): Promise<Langer<T>> {
-    if (this._initialized) {
-      throw new Error('[langer] Invalid operation. This has been initialized.');
-    }
-    await this.internalUpdate(data, reset);
-    this.setInitialized();
-    return (this as unknown) as Langer<T>;
-  }
-
-  protected async internalUpdate(data: Dictionary, reset: boolean) {
-    this._data = data;
-    const langs = Object.keys(this._data);
-    if (!langs || langs.length === 0) {
-      throw new Error(
-        '[langer] Initialization failed. Unable to get the list of available languages.'
-      );
-    }
-    this.setAvailableLanguages(langs);
-
-    if (reset) {
-      await this.resetLanguage();
-      return;
-    }
-
-    const lang = this._currLanguage || (await this._recorder.get());
-    if (lang) {
-      await this.changeSays(lang);
-    } else {
-      await this.resetLanguage();
-    }
-  }
-
-  async update<T extends Dictionary = Dictionary>(
-    data: T,
-    reset = false
-  ): Promise<Langer<T>> {
-    if (!this._initialized || this._disposed) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-    await this.internalUpdate(data, reset);
-    return (this as unknown) as Langer<T>;
-  }
-
-  protected async changeSays(language: StringKeyof<keyof TData> | string) {
-    this.setCurrLanguage(language);
-    await this._recorder.set(language);
-    this.setSays(this._data[language]);
-  }
-
-  get availableLanguages() {
-    if (!this._availableLanguages) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-    return this._availableLanguages as StringKeyof<TData>[];
-  }
-  get speaking() {
-    if (!this._currLanguage) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-    return this._currLanguage as StringKeyof<TData>;
-  }
-  get says() {
-    if (!this._says) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-    return this._says as Says<TData>;
-  }
-
-  async speak(language: keyof TData & string) {
-    if (!this._availableLanguages) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-    if (!this._availableLanguages.includes(language)) {
-      throw new Error(
-        `[langer] Cannot speak the "${language}" language that are not on the available languages(${this._availableLanguages}).`
-      );
-    }
-    await this.changeSays(language);
-  }
-
-  async resetLanguage() {
-    if (!this._availableLanguages) {
-      throw new Error(
-        '[langer] Invalid operation. Not initialized yet, failed to initialize or has been disposed.'
-      );
-    }
-
-    let lang: string;
-    if (typeof this._preset === 'string') {
-      lang = this._preset;
-    } else {
-      lang = await this._preset(
-        this._availableLanguages,
-        navigator.languages as string[]
-      );
-    }
-
-    if (!this._availableLanguages.includes(lang)) {
-      throw new Error(
-        `[langer] The preset language "${lang}" is not on the available languages(${this._availableLanguages}).`
-      );
-    }
-
-    await this.changeSays(lang);
-    return lang as StringKeyof<TData>;
-  }
-
   dispose() {
-    if (this._disposed) {
-      throw new Error('[langer] Invalid operation. This has been disposed.');
-    }
-
     //@ts-expect-error
-    this._recorder = undefined;
-    //@ts-expect-error
-    this._preset = undefined;
-
-    //@ts-expect-error
-    this.setSays(undefined);
     this._data = undefined;
     //@ts-expect-error
-    this.setAvailableLanguages(undefined);
-    //@ts-expect-error
-    this.setCurrLanguage(undefined);
+    this._priorities = undefined;
+  }
+}
 
-    this._disposed = true;
+export class Driver02<TSays, TLangs extends string[]>
+  implements DriverInterface<TSays, TLangs> {
+  constructor(
+    private _availableLanguages: TLangs,
+    private _onSpeakingChange: (Language: TLangs[number]) => TSays,
+    private _priorities = navigator.languages
+  ) {}
+  update<TSays, TLangs extends string[]>(
+    availableLanguages: TLangs,
+    onSpeakingChange: (Language: TLangs[number]) => TSays
+  ) {
+    this._availableLanguages = availableLanguages as any;
+    this._onSpeakingChange = onSpeakingChange as any;
+    return (this as any) as Driver02<TSays, TLangs>;
+  }
+  onAvailableLanguages() {
+    return this._availableLanguages;
+  }
+  onPresetLanguage(availableLanguages: TLangs) {
+    return presetLanguage(availableLanguages, this._priorities);
+  }
+  onSpeakingChange(Language: TLangs[number]) {
+    return this._onSpeakingChange(Language);
+  }
+  dispose() {
+    //@ts-expect-error
+    this._availableLanguages = undefined;
+    //@ts-expect-error
+    this._onSpeakingChange = undefined;
+    //@ts-expect-error
+    this._priorities = undefined;
   }
 }
