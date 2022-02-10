@@ -70,6 +70,25 @@ describe('langer', () => {
     expect(() => presetLanguage(Object.keys(fetched), ['ja'])).toThrowError(
       '[langer] Cannot preset language.'
     );
+
+    expect(presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh_CN'], ['zh'])).toBe(
+      'zh_TW'
+    );
+    expect(presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh_CN'], ['ZH'])).toBe(
+      'zh_TW'
+    );
+    expect(
+      presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh', 'zh_CN'], ['zh'])
+    ).toBe('zh');
+    expect(
+      presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh', 'zh_CN'], ['zh_HK'])
+    ).toBe('zh_TW');
+    expect(
+      presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh', 'zh_CN'], ['jA'])
+    ).toBe('ja_JP');
+    expect(() =>
+      presetLanguage(['en_US', 'ja_JP', 'zh_TW', 'zh', 'zh_CN'], ['JP'])
+    ).toThrowError('[langer] Cannot preset language.');
   });
 
   it('driver01', async () => {

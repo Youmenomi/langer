@@ -242,16 +242,26 @@ export function presetLanguage<TLangs extends string[]>(
   priorities: readonly string[]
 ) {
   let found: TLangs[number] | undefined;
-  priorities.some((lang) => {
-    if (availableLanguages.includes(lang)) {
-      found = lang;
+  const prioritiesLC = priorities.map((prioritie) => prioritie.toLowerCase());
+  const availableLanguagesLC = availableLanguages.map((available) =>
+    available.toLowerCase()
+  );
+  prioritiesLC.some((prioritieLC) => {
+    prioritieLC = prioritieLC.replace('-', '_');
+    const i = availableLanguagesLC.indexOf(prioritieLC);
+    if (i > -1) {
+      found = availableLanguages[i];
       return true;
     }
-    lang = lang.split('-')[0];
-    if (availableLanguages.includes(lang)) {
-      found = lang;
-      return true;
-    }
+    const lang = prioritieLC.split('_')[0];
+    availableLanguagesLC.some((availableLC, i) => {
+      if (lang === availableLC.split('_')[0]) {
+        found = availableLanguages[i];
+        return true;
+      }
+      return false;
+    });
+    if (found) return true;
     return false;
   });
   if (!found) throw new Error('[langer] Cannot preset language.');

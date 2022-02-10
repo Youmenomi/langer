@@ -1,15 +1,16 @@
 {
   "name": "langer",
   "version": "0.2.0",
-  "description": "",
+  "description": "Localization tool with a unified interface and replaceable drivers.",
   "keywords": [
     "typescript",
     "intl",
-    "Localization",
+    "localization",
     "globalization",
     "translation",
     "multi-language",
-    "remote"
+    "remote",
+    "scalable"
   ],
   "main": "dist/cjs/langer.cjs.js",
   "module": "dist/esm/langer.esm.js",
